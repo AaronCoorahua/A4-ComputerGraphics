@@ -183,6 +183,8 @@ private:
 
     GLuint loadCubemap(const std::vector<std::string>& faces);
     void _setupSkybox();
+    void _moveZombies(float deltaTime);
+    void _collideZombiesWithZombies();
 };
 
 // Declaración de las funciones de callback

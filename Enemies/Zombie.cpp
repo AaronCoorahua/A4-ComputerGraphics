@@ -6,7 +6,8 @@
 
 Zombie::Zombie(GLuint shaderProgramHandle, GLint mvpMtxUniformLocation, GLint normalMtxUniformLocation)
     : _shaderProgramHandle(shaderProgramHandle),
-    rotationAngle(0.0f){
+    rotationAngle(0.0f),
+    radius(1.0f){
 
     _shaderProgramUniformLocations.mvpMtx    = mvpMtxUniformLocation;
     _shaderProgramUniformLocations.normalMtx = normalMtxUniformLocation;
@@ -95,16 +96,17 @@ void Zombie::moveBackward() {
 
 void Zombie::update(float deltaTime, glm::vec3 heroPosition) {
     // Calcular dirección hacia el héroe
-    glm::vec3 direction = heroPosition - position;
-    direction.y = 0.0f; // Ignorar componente Y para movimiento en plano XZ
+    glm::vec3 directionToHero = heroPosition - position;
+    directionToHero.y = 0.0f; // Ignorar componente Y para movimiento en plano XZ
 
     // Evitar división por cero
-    if(glm::length(direction) < 0.1f) return;
+    if(glm::length(directionToHero) < 0.1f) return;
 
-    direction = glm::normalize(direction);
+    // Normalizar la dirección hacia el héroe
+    glm::vec3 desiredDirection = glm::normalize(directionToHero);
 
     // Calcular el ángulo deseado
-    float desiredAngle = atan2f(-direction.x, -direction.z);
+    float desiredAngle = atan2f(-desiredDirection.x, -desiredDirection.z);
 
     // Calcular la diferencia de ángulo
     float angleDifference = desiredAngle - rotationAngle;
@@ -130,14 +132,19 @@ void Zombie::update(float deltaTime, glm::vec3 heroPosition) {
     else if(rotationAngle < 0.0f)
         rotationAngle += glm::two_pi<float>();
 
-    // Actualizar posición
-    float moveSpeed = 5.0f; // Unidades por segundo
-    glm::vec3 forward(
+    // Actualizar la dirección basada en rotationAngle
+    glm::vec3 forwardDirection(
         -sinf(rotationAngle),
         0.0f,
-        -cosf(rotationAngle) // Invertimos el signo aquí
+        -cosf(rotationAngle)
     );
-    position += forward * moveSpeed * deltaTime;
+
+    // Actualizar la velocidad
+    float moveSpeed = 5.0f; // Unidades por segundo
+    velocity = forwardDirection * moveSpeed;
+
+    // Actualizar posición usando la velocidad
+    position += velocity * deltaTime;
 
     // Actualizar movimiento de los brazos
     moveForward();

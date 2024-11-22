@@ -639,6 +639,9 @@ void MP::_updateScene(float deltaTime) {
             _zombies[i]->update(deltaTime, _planePosition); // Pasamos la posición del héroe
         }
     }
+
+    _moveZombies(deltaTime);
+    _collideZombiesWithZombies();
 }
 
 void MP::run() {
@@ -837,6 +840,72 @@ void MP::_setupSkybox() {
     _skyboxShaderProgram = new CSCI441::ShaderProgram("shaders/skybox.v.glsl", "shaders/skybox.f.glsl");
     _skyboxShaderProgram->useProgram();
     _skyboxShaderProgram->setProgramUniform("skybox", 0);
+}
+
+
+void MP::_moveZombies(float deltaTime) {
+    for(int i = 0; i < NUM_ZOMBIES; ++i) {
+        if(_zombies[i] != nullptr) {
+            _zombies[i]->update(deltaTime, _planePosition);
+        }
+    }
+}
+
+void MP::_collideZombiesWithZombies() {
+    for(unsigned int i = 0; i < NUM_ZOMBIES; i++) {
+        Zombie* zombie1 = _zombies[i];
+        if(zombie1 == nullptr) continue;
+
+        for(unsigned int j = i + 1; j < NUM_ZOMBIES; j++) {
+            Zombie* zombie2 = _zombies[j];
+            if(zombie2 == nullptr) continue;
+
+            // Calcular la distancia entre los zombies
+            glm::vec3 delta = zombie1->position - zombie2->position;
+            float distance = glm::length(delta);
+
+            // Calcular la suma de los radios
+            float sumRadius = zombie1->radius + zombie2->radius;
+
+            // Si hay colisión
+            if(distance < sumRadius) {
+                // Normalizar el vector de colisión
+                glm::vec3 collisionNormal = glm::normalize(delta);
+
+                // Calcular la velocidad relativa en la dirección normal
+                glm::vec3 relativeVelocity = zombie1->velocity - zombie2->velocity;
+                float velocityAlongNormal = glm::dot(relativeVelocity, collisionNormal);
+
+                // Evitar calcular si las velocidades se están separando
+                if(velocityAlongNormal > 0)
+                    continue;
+
+                // Coeficiente de restitución (elasticidad del rebote)
+                float e = 0.5f; // Ajusta este valor entre 0 (inelástico) y 1 (elástico)
+
+                // Calcular el impulso escalar
+                float j = -(1 + e) * velocityAlongNormal;
+                j /= 2; // Suponiendo masas iguales
+
+                // Calcular el impulso vectorial
+                glm::vec3 impulse = j * collisionNormal;
+
+                // Actualizar las velocidades de los zombies
+                zombie1->velocity += impulse;
+                zombie2->velocity -= impulse;
+
+                // Separar los zombies para evitar superposición
+                float penetrationDepth = sumRadius - distance;
+                glm::vec3 correction = (penetrationDepth / 2.0f) * collisionNormal;
+                zombie1->position += correction;
+                zombie2->position -= correction;
+
+                // Ajustar la rotación para que sigan mirando al héroe
+                zombie1->rotationAngle = atan2f(-zombie1->velocity.x, -zombie1->velocity.z);
+                zombie2->rotationAngle = atan2f(-zombie2->velocity.x, -zombie2->velocity.z);
+            }
+        }
+    }
 }
 
 

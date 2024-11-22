@@ -24,7 +24,9 @@ public:
      */
     void update(float deltaTime, glm::vec3 heroPosition); // Declaración del método update
     glm::vec3 position;
-    float rotationAngle = 0.0f;
+    glm::vec3 velocity;
+    float rotationAngle;
+    float radius;
 
 private:
     GLuint _shaderProgramHandle;
