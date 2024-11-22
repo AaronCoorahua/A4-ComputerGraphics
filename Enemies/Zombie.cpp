@@ -131,16 +131,16 @@ void Zombie::update(float deltaTime, glm::vec3 heroPosition) {
         rotationAngle += glm::two_pi<float>();
 
     // Actualizar posición
-    //float moveSpeed = 5.0f; // Unidades por segundo
-    //glm::vec3 forward(
-    //    sinf(rotationAngle),
-    //    0.0f,
-    //    -cosf(rotationAngle) // Invertimos el signo aquí
-    //);
-    //position += forward * moveSpeed * deltaTime;
+    float moveSpeed = 5.0f; // Unidades por segundo
+    glm::vec3 forward(
+        -sinf(rotationAngle),
+        0.0f,
+        -cosf(rotationAngle) // Invertimos el signo aquí
+    );
+    position += forward * moveSpeed * deltaTime;
 
     // Actualizar movimiento de los brazos
-    //moveForward();
+    moveForward();
 }
 
 
