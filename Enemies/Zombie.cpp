@@ -5,7 +5,8 @@
 #include <OpenGLUtils.hpp>
 
 Zombie::Zombie(GLuint shaderProgramHandle, GLint mvpMtxUniformLocation, GLint normalMtxUniformLocation)
-    : _shaderProgramHandle(shaderProgramHandle) {
+    : _shaderProgramHandle(shaderProgramHandle),
+    rotationAngle(0.0f){
 
     _shaderProgramUniformLocations.mvpMtx    = mvpMtxUniformLocation;
     _shaderProgramUniformLocations.normalMtx = normalMtxUniformLocation;
@@ -92,26 +93,57 @@ void Zombie::moveBackward() {
     }
 }
 
-void Zombie::update(float deltaTime) {
-    // Implementa aquí la lógica de actualización del zombie.
-    // Por ejemplo, hacer que el zombie patrulle girando y moviéndose lentamente.
+void Zombie::update(float deltaTime, glm::vec3 heroPosition) {
+    // Calcular dirección hacia el héroe
+    glm::vec3 direction = heroPosition - position;
+    direction.y = 0.0f; // Ignorar componente Y para movimiento en plano XZ
 
-    // Rotación continua
-    float rotationSpeed = glm::radians(20.0f); // 20 grados por segundo
-    rotationAngle += rotationSpeed * deltaTime;
+    // Evitar división por cero
+    if(glm::length(direction) < 0.1f) return;
 
-    // Mantener el ángulo dentro de [0, 2π]
-    if (rotationAngle > glm::two_pi<float>())
+    direction = glm::normalize(direction);
+
+    // Calcular el ángulo deseado
+    float desiredAngle = atan2f(-direction.x, -direction.z);
+
+    // Calcular la diferencia de ángulo
+    float angleDifference = desiredAngle - rotationAngle;
+
+    // Asegurar que la diferencia de ángulo esté en el rango [-pi, pi]
+    if(angleDifference > glm::pi<float>())
+        angleDifference -= glm::two_pi<float>();
+    if(angleDifference < -glm::pi<float>())
+        angleDifference += glm::two_pi<float>();
+
+    // Definir velocidad máxima de rotación
+    float maxRotationSpeed = glm::radians(90.0f); // 90 grados por segundo
+
+    // Limitar el cambio de rotación a la velocidad máxima
+    float rotationChange = glm::clamp(angleDifference, -maxRotationSpeed * deltaTime, maxRotationSpeed * deltaTime);
+
+    // Actualizar el ángulo de rotación
+    rotationAngle += rotationChange;
+
+    // Mantener rotationAngle dentro de [0, 2π]
+    if(rotationAngle > glm::two_pi<float>())
         rotationAngle -= glm::two_pi<float>();
-    else if (rotationAngle < 0.0f)
+    else if(rotationAngle < 0.0f)
         rotationAngle += glm::two_pi<float>();
 
-    // Movimiento lento hacia adelante
-    float moveSpeed = 1.0f * deltaTime; // 1 unidad por segundo
-    position += glm::vec3(0.0f, 0.0f, -moveSpeed); // Mover hacia adelante en el eje Z
+    // Actualizar posición
+    //float moveSpeed = 5.0f; // Unidades por segundo
+    //glm::vec3 forward(
+    //    sinf(rotationAngle),
+    //    0.0f,
+    //    -cosf(rotationAngle) // Invertimos el signo aquí
+    //);
+    //position += forward * moveSpeed * deltaTime;
 
-    // Opcional: Agregar límites de movimiento o lógica adicional
+    // Actualizar movimiento de los brazos
+    //moveForward();
 }
+
+
 
 void Zombie::_drawBody(glm::mat4 modelMtx, glm::mat4 viewMtx, glm::mat4 projMtx) const {
     glm::mat4 bodyMtx = modelMtx;

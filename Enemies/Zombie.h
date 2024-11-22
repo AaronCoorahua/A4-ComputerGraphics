@@ -22,7 +22,9 @@ public:
      * @brief Actualiza el estado del zombie.
      * @param deltaTime Tiempo transcurrido desde la última actualización.
      */
-    void update(float deltaTime); // Declaración del método update
+    void update(float deltaTime, glm::vec3 heroPosition); // Declaración del método update
+    glm::vec3 position;
+    float rotationAngle = 0.0f;
 
 private:
     GLuint _shaderProgramHandle;
@@ -41,8 +43,7 @@ private:
     glm::vec3 _colorBag;
     glm::vec3 _colorArm; // Nueva variable para el color de los brazos
 
-    glm::vec3 position;
-    float rotationAngle = 0.0f;
+
 
     void _drawBody(glm::mat4 modelMtx, glm::mat4 viewMtx, glm::mat4 projMtx) const;
     void _drawArmRight(glm::mat4 modelMtx, glm::mat4 viewMtx, glm::mat4 projMtx) const;

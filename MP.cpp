@@ -331,6 +331,13 @@ void MP::mSetupScene() {
     _zombiePositions[6] = glm::vec3(cornerOffset - spacing, zombieHeight, cornerOffset - spacing);
     _zombiePositions[7] = glm::vec3(cornerOffset + spacing, zombieHeight, cornerOffset + spacing);
 
+    for(int i = 0; i < NUM_ZOMBIES; ++i) {
+        if(_zombies[i] != nullptr) {
+            _zombies[i]->position = _zombiePositions[i];
+            _zombies[i]->rotationAngle = 0.0f;
+        }
+    }
+
     // Configurar la matriz de proyección
     int width, height;
     glfwGetFramebufferSize(mpWindow, &width, &height);
@@ -494,12 +501,6 @@ void MP::_renderScene(glm::mat4 viewMtx, glm::mat4 projMtx, glm::vec3 eyePositio
     for(int i = 0; i < NUM_ZOMBIES; ++i) {
         if(_zombies[i] != nullptr) {
             glm::mat4 zombieModelMtx(1.0f);
-            zombieModelMtx = glm::translate(zombieModelMtx, _zombiePositions[i]);
-            // Si deseas rotar o escalar los zombies, puedes hacerlo aquí
-            // Por ejemplo:
-            // zombieModelMtx = glm::rotate(zombieModelMtx, glm::radians(90.0f), CSCI441::Y_AXIS);
-            // zombieModelMtx = glm::scale(zombieModelMtx, glm::vec3(1.0f));
-
             _zombies[i]->drawVehicle(zombieModelMtx, viewMtx, projMtx);
         }
     }
@@ -635,7 +636,7 @@ void MP::_updateScene(float deltaTime) {
     // Opcional: Actualizar zombies si tienen comportamientos
     for(int i = 0; i < NUM_ZOMBIES; ++i) {
         if(_zombies[i] != nullptr) {
-            _zombies[i]->update(deltaTime); // Implementa este método en la clase Zombie
+            _zombies[i]->update(deltaTime, _planePosition); // Pasamos la posición del héroe
         }
     }
 }
