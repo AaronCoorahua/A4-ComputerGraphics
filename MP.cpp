@@ -38,7 +38,8 @@ MP::MP()
       _isSmallViewportActive(false),
       _isHeroDamaged(false),
       _heroDamageTime(0.0f),
-      _heroVelocity(0.0f, 0.0f, 0.0f)
+      _heroVelocity(0.0f, 0.0f, 0.0f),
+      _gameState(PLAYING)
 {
     // Inicializar todas las teclas como no presionadas
     for(auto& _key : _keys) _key = GL_FALSE;
@@ -107,6 +108,11 @@ void MP::handleKeyEvent(GLint key, GLint action) {
                 break;
             case GLFW_KEY_1:
                 _isSmallViewportActive = !_isSmallViewportActive;
+                break;
+            case GLFW_KEY_R:
+                if (_gameState == WON || _gameState == LOST) {
+                    _resetGame();
+                }
                 break;
             default:
                 break;
@@ -271,6 +277,61 @@ void MP::mSetupBuffers() {
 
     glBindBuffer(GL_ARRAY_BUFFER, _heartVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(heartVertices), heartVertices, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0); // Asumiendo que el atributo posición está en location 0
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    // Coordenadas de textura
+    glEnableVertexAttribArray(1); // Asumiendo que el atributo textura está en location 1
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+    glBindVertexArray(0);
+
+    float winVertices[] = {
+        // Posiciones    // Coordenadas de textura
+        0.0f, 1.0f,      0.0f, 1.0f, // Arriba izquierda
+        1.0f, 0.0f,      1.0f, 0.0f, // Abajo derecha
+        0.0f, 0.0f,      0.0f, 0.0f, // Abajo izquierda
+
+        0.0f, 1.0f,      0.0f, 1.0f, // Arriba izquierda
+        1.0f, 1.0f,      1.0f, 1.0f, // Arriba derecha
+        1.0f, 0.0f,      1.0f, 0.0f  // Abajo derecha
+    };
+
+
+    glGenVertexArrays(1, &_winVAO);
+    glGenBuffers(1, &_winVBO);
+
+    glBindVertexArray(_winVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, _winVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(winVertices), winVertices, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0); // Asumiendo que el atributo posición está en location 0
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    // Coordenadas de textura
+    glEnableVertexAttribArray(1); // Asumiendo que el atributo textura está en location 1
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+    glBindVertexArray(0);
+
+    float lostVertices[] = {
+        // Posiciones    // Coordenadas de textura
+        0.0f, 1.0f,      0.0f, 1.0f, // Arriba izquierda
+        1.0f, 0.0f,      1.0f, 0.0f, // Abajo derecha
+        0.0f, 0.0f,      0.0f, 0.0f, // Abajo izquierda
+
+        0.0f, 1.0f,      0.0f, 1.0f, // Arriba izquierda
+        1.0f, 1.0f,      1.0f, 1.0f, // Arriba derecha
+        1.0f, 0.0f,      1.0f, 0.0f  // Abajo derecha
+    };
+
+    glGenVertexArrays(1, &_lostVAO);
+    glGenBuffers(1, &_lostVBO);
+
+    glBindVertexArray(_lostVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, _lostVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(lostVertices), lostVertices, GL_STATIC_DRAW);
 
     // Posiciones
     glEnableVertexAttribArray(0);
@@ -462,6 +523,54 @@ void MP::mSetupScene() {
     } else {
         std::cout << "Failed to load heart texture" << std::endl;
     }
+
+    int win_width, win_height, win_nrChannels;
+    unsigned char *win_data = stbi_load("textures/you_win.png", &win_width, &win_height, &win_nrChannels, 0);
+    if (win_data) {
+        glGenTextures(1, &_winTexture);
+        glBindTexture(GL_TEXTURE_2D, _winTexture);
+
+        // Configurar los parámetros de la textura
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        GLenum format = GL_RGBA;
+        if (win_nrChannels == 3)
+            format = GL_RGB;
+
+        glTexImage2D(GL_TEXTURE_2D, 0, format, win_width, win_height, 0, format, GL_UNSIGNED_BYTE, win_data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        stbi_image_free(win_data);
+    } else {
+        std::cout << "Failed to load 'You Win' texture" << std::endl;
+    }
+
+    int lost_width, lost_height, lost_nrChannels;
+    unsigned char *lost_data = stbi_load("textures/you_lost.png", &lost_width, &lost_height, &lost_nrChannels, 0);
+    if (lost_data) {
+        glGenTextures(1, &_lostTexture);
+        glBindTexture(GL_TEXTURE_2D, _lostTexture);
+
+        // Configurar los parámetros de la textura
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        GLenum format = GL_RGBA;
+        if (lost_nrChannels == 3)
+            format = GL_RGB;
+
+        glTexImage2D(GL_TEXTURE_2D, 0, format, lost_width, lost_height, 0, format, GL_UNSIGNED_BYTE, lost_data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        stbi_image_free(lost_data);
+    } else {
+        std::cout << "Failed to load 'You Lost' texture" << std::endl;
+    }
 }
 
 void MP::mCleanupShaders() {
@@ -486,6 +595,14 @@ void MP::mCleanupBuffers() {
     fprintf(stdout, "[INFO]: ...deleting models..\n");
     delete _pPlane;
     glDeleteTextures(1, &_heartTexture);
+
+    glDeleteVertexArrays(1, &_winVAO);
+    glDeleteBuffers(1, &_winVBO);
+    glDeleteTextures(1, &_winTexture);
+
+    glDeleteVertexArrays(1, &_lostVAO);
+    glDeleteBuffers(1, &_lostVBO);
+    glDeleteTextures(1, &_lostTexture);
 }
 
 void MP::_renderScene(glm::mat4 viewMtx, glm::mat4 projMtx, glm::vec3 eyePosition) const {
@@ -580,7 +697,7 @@ void MP::_renderScene(glm::mat4 viewMtx, glm::mat4 projMtx, glm::vec3 eyePositio
 }
 
 void MP::_updateScene(float deltaTime) {
-    float moveSpeed = 0.1f;
+    float moveSpeed = 0.5f;
     float rotateSpeed = glm::radians(1.5f);
 
     const float MIN_X = -WORLD_SIZE + 3.0f;
@@ -705,32 +822,49 @@ void MP::_updateScene(float deltaTime) {
         }
     }
 
-    _planePosition += _heroVelocity * deltaTime;
-    _planePosition.y = 0.0f;
-    // Aplicar fricción para reducir gradualmente la velocidad
-    _heroVelocity *= 0.98f;
-    _heroVelocity.y = 0.0f;
-
-    // Opcional: Actualizar zombies si tienen comportamientos
-    for(int i = 0; i < NUM_ZOMBIES; ++i) {
-        if(_zombies[i] != nullptr) {
-            _zombies[i]->update(deltaTime, _planePosition); // Pasamos la posición del héroe
+    bool allCoinsCollected = true;
+    for (int i = 0; i < 4; ++i) {
+        if (_coins[i]->isActive()) {
+            allCoinsCollected = false;
+            break;
         }
     }
 
-    _moveZombies(deltaTime);
-    _collideZombiesWithZombies();
+    if (allCoinsCollected && _gameState == PLAYING) {
+        _gameState = WON;
+        std::cout << "¡Has ganado el juego!" << std::endl;
+    }
 
-    _collideHeroWithZombies(deltaTime);
+    if (_gameState == PLAYING) {
+        _planePosition += _heroVelocity * deltaTime;
+        _planePosition.y = 0.0f;
+        // Aplicar fricción para reducir gradualmente la velocidad
+        _heroVelocity *= 0.98f;
+        _heroVelocity.y = 0.0f;
 
-    // Actualizar el temporizador de daño del héroe
-    if(_isHeroDamaged) {
-        _heroDamageTime += deltaTime;
-        if(_heroDamageTime >= HERO_DAMAGE_DURATION) {
-            _isHeroDamaged = false;
-            _heroDamageTime = 0.0f;
+        // Opcional: Actualizar zombies si tienen comportamientos
+        for(int i = 0; i < NUM_ZOMBIES; ++i) {
+            if(_zombies[i] != nullptr) {
+                _zombies[i]->update(deltaTime, _planePosition); // Pasamos la posición del héroe
+            }
+        }
+
+        _moveZombies(deltaTime);
+        _collideZombiesWithZombies();
+
+        _collideHeroWithZombies(deltaTime);
+
+        // Actualizar el temporizador de daño del héroe
+        if(_isHeroDamaged) {
+            _heroDamageTime += deltaTime;
+            if(_heroDamageTime >= HERO_DAMAGE_DURATION) {
+                _isHeroDamaged = false;
+                _heroDamageTime = 0.0f;
+            }
         }
     }
+
+
 }
 
 void MP::run() {
@@ -754,56 +888,81 @@ void MP::run() {
         float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
         _projectionMatrix = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 1000.0f);
 
-        glm::mat4 viewMatrix;
-        glm::vec3 eyePosition;
 
-        if (_currentCameraMode == ARCBALL) {
-            viewMatrix = _arcballCam->getViewMatrix();
-            eyePosition = _arcballCam->getPosition();
-        } else if (_currentCameraMode == FIRST_PERSON_CAM) {
-            // Solo hay una cámara en primera persona para AARON_INTI
-            viewMatrix = _intiFirstPersonCam->getViewMatrix();
-            eyePosition = _intiFirstPersonCam->getPosition();
+        if (_gameState == PLAYING) {
+            glm::mat4 viewMatrix;
+            glm::vec3 eyePosition;
+
+            if (_currentCameraMode == ARCBALL) {
+                viewMatrix = _arcballCam->getViewMatrix();
+                eyePosition = _arcballCam->getPosition();
+            } else if (_currentCameraMode == FIRST_PERSON_CAM) {
+                // Solo hay una cámara en primera persona para AARON_INTI
+                viewMatrix = _intiFirstPersonCam->getViewMatrix();
+                eyePosition = _intiFirstPersonCam->getPosition();
+            }
+
+            _renderScene(viewMatrix, _projectionMatrix, eyePosition);
+
+            if (_isSmallViewportActive) {
+                GLint prevViewport[4];
+                glGetIntegerv(GL_VIEWPORT, prevViewport);
+
+                glClear(GL_DEPTH_BUFFER_BIT);
+
+                GLint smallViewportWidth = framebufferWidth / 3;
+                GLint smallViewportHeight = framebufferHeight / 3;
+                GLint smallViewportX = framebufferWidth - smallViewportWidth - 10;
+                GLint smallViewportY = framebufferHeight - smallViewportHeight - 10;
+
+                glViewport(smallViewportX, smallViewportY, smallViewportWidth, smallViewportHeight);
+
+                float smallAspectRatio = static_cast<float>(smallViewportWidth) / static_cast<float>(smallViewportHeight);
+
+                glm::mat4 smallProjectionMatrix = glm::perspective(glm::radians(45.0f), smallAspectRatio, 0.1f, 1000.0f);
+
+                glm::mat4 fpViewMatrix = _intiFirstPersonCam->getViewMatrix();
+                glm::vec3 fpEyePosition = _intiFirstPersonCam->getPosition();
+
+                _renderScene(fpViewMatrix, smallProjectionMatrix, fpEyePosition);
+
+                glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+
+            }
+            glDisable(GL_DEPTH_TEST);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            // Dibujar el HUD
+            _drawHUD();
+
+            // Restaurar estado de OpenGL
+            glEnable(GL_DEPTH_TEST);
+            glDisable(GL_BLEND);
+            _updateScene(deltaTime);
+        } else if (_gameState == WON) {
+            // Renderizar la pantalla de victoria
+            glDisable(GL_DEPTH_TEST);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            _drawWinScreen();
+
+            // Restaurar estado de OpenGL
+            glEnable(GL_DEPTH_TEST);
+            glDisable(GL_BLEND);
+        } else if (_gameState == LOST) {
+            // Renderizar la pantalla de derrota
+            glDisable(GL_DEPTH_TEST);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            _drawLostScreen();
+
+            // Restaurar estado de OpenGL
+            glEnable(GL_DEPTH_TEST);
+            glDisable(GL_BLEND);
         }
-
-        _renderScene(viewMatrix, _projectionMatrix, eyePosition);
-
-        if (_isSmallViewportActive) {
-            GLint prevViewport[4];
-            glGetIntegerv(GL_VIEWPORT, prevViewport);
-
-            glClear(GL_DEPTH_BUFFER_BIT);
-
-            GLint smallViewportWidth = framebufferWidth / 3;
-            GLint smallViewportHeight = framebufferHeight / 3;
-            GLint smallViewportX = framebufferWidth - smallViewportWidth - 10;
-            GLint smallViewportY = framebufferHeight - smallViewportHeight - 10;
-
-            glViewport(smallViewportX, smallViewportY, smallViewportWidth, smallViewportHeight);
-
-            float smallAspectRatio = static_cast<float>(smallViewportWidth) / static_cast<float>(smallViewportHeight);
-
-            glm::mat4 smallProjectionMatrix = glm::perspective(glm::radians(45.0f), smallAspectRatio, 0.1f, 1000.0f);
-
-            glm::mat4 fpViewMatrix = _intiFirstPersonCam->getViewMatrix();
-            glm::vec3 fpEyePosition = _intiFirstPersonCam->getPosition();
-
-            _renderScene(fpViewMatrix, smallProjectionMatrix, fpEyePosition);
-
-            glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-
-        }
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        // Dibujar el HUD
-        _drawHUD();
-
-        // Restaurar estado de OpenGL
-        glEnable(GL_DEPTH_TEST);
-        glDisable(GL_BLEND);
-        _updateScene(deltaTime);
 
         glfwSwapBuffers(mpWindow);
         glfwPollEvents();
@@ -837,7 +996,7 @@ void MP::_collideHeroWithZombies(float deltaTime) {
                 _heroLives--;
                 if(_heroLives <= 0) {
                     std::cout << "¡El héroe ha perdido todas sus vidas!" << std::endl;
-                    // Manejar fin del juego o reinicio
+                    _gameState = LOST;
                 }
 
                 // Calcular dirección de empuje
@@ -1080,7 +1239,102 @@ void MP::_drawHUD() {
     glBindVertexArray(0);
 }
 
+void MP::_drawWinScreen() {
+    _hudShaderProgram->useProgram();
+    _hudShaderProgram->setProgramUniform("projection", _hudProjection);
 
+    glBindVertexArray(_winVAO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, _winTexture);
+    _hudShaderProgram->setProgramUniform("texture1", 0); // Asignamos la unidad de textura 0
+
+    // Dibujar la imagen de "You Win" cubriendo toda la pantalla
+    glm::mat4 model = glm::mat4(1.0f);
+
+    // Ajustar el tamaño y posición para cubrir toda la pantalla
+    float width = static_cast<float>(framebufferWidth);
+    float height = static_cast<float>(framebufferHeight);
+
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+    model = glm::scale(model, glm::vec3(width, height, 1.0f));
+
+    _hudShaderProgram->setProgramUniform("model", model);
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glBindVertexArray(0);
+}
+
+
+void MP::_drawLostScreen() {
+    _hudShaderProgram->useProgram();
+    _hudShaderProgram->setProgramUniform("projection", _hudProjection);
+
+    glBindVertexArray(_lostVAO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, _lostTexture);
+    _hudShaderProgram->setProgramUniform("texture1", 0); // Asignamos la unidad de textura 0
+
+    // Dibujar la imagen de "You Lost" cubriendo toda la pantalla
+    glm::mat4 model = glm::mat4(1.0f);
+
+    // Ajustar el tamaño y posición para cubrir toda la pantalla
+    float width = static_cast<float>(framebufferWidth);
+    float height = static_cast<float>(framebufferHeight);
+
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+    model = glm::scale(model, glm::vec3(width, height, 1.0f));
+
+    _hudShaderProgram->setProgramUniform("model", model);
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glBindVertexArray(0);
+}
+
+void MP::_resetGame() {
+    // Restablecer el estado del juego
+    _gameState = PLAYING;
+
+    // Restablecer la posición y orientación del héroe
+    _planePosition = glm::vec3(0.0f, 0.0f, 0.0f);
+    _planeHeading = 0.0f;
+    _heroVelocity = glm::vec3(0.0f);
+    _isHeroDamaged = false;
+    _heroDamageTime = 0.0f;
+    _heroLives = 5; // Restablecer las vidas del héroe
+
+    // Restablecer las posiciones y estados de los zombies
+    for(int i = 0; i < NUM_ZOMBIES; ++i) {
+        if(_zombies[i] != nullptr) {
+            _zombies[i]->position = _zombiePositions[i];
+            _zombies[i]->rotationAngle = 0.0f;
+            _zombies[i]->velocity = glm::vec3(0.0f);
+
+            // Asignar multiplicadores de velocidad nuevamente si es necesario
+            if(i % 3 == 0) {
+                _zombies[i]->speedMultiplier = 0.7f; // Zombies más lentos
+            } else {
+                _zombies[i]->speedMultiplier = 1.0f; // Velocidad normal
+            }
+        }
+    }
+
+    // Reactivar todas las monedas
+    for(int i = 0; i < 4; ++i) {
+        _coins[i] = new Coin(_lightingShaderProgram->getShaderProgramHandle(),
+                             _lightingShaderUniformLocations.mvpMatrix,
+                             _lightingShaderUniformLocations.normalMatrix);
+    }
+
+    // Restablecer la cámara si es necesario
+    _arcballCam->setCameraView(
+        glm::vec3(0.0f, 50.0f, 100.0f), // Posición del ojo
+        glm::vec3(0.0f, 0.0f, 0.0f),    // Punto de mirada (posición del plano)
+        CSCI441::Y_AXIS                 // Vector hacia arriba
+    );
+    _updateIntiFirstPersonCamera();
+}
 
 void MP::_computeAndSendMatrixUniforms(glm::mat4 modelMtx, glm::mat4 viewMtx, glm::mat4 projMtx) const {
     // Precompute the Model-View-Projection matrix on the CPU

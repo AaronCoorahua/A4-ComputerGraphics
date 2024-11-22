@@ -62,6 +62,17 @@ public:
     static constexpr GLfloat MOUSE_UNINITIALIZED = -9999.0f;
 
 private:
+    void _drawLostScreen();
+    GLuint _lostTexture;
+    GLuint _lostVAO = 0;
+    GLuint _lostVBO = 0;
+    void _resetGame();
+    void _drawWinScreen();
+    GLuint _winTexture;
+    GLuint _winVAO = 0;
+    GLuint _winVBO = 0;
+    enum GameState { PLAYING, WON, LOST };
+    GameState _gameState;
     int framebufferWidth, framebufferHeight;
     void _drawHUD();
     int _heroLives = 3;
