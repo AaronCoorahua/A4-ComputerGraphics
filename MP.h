@@ -62,6 +62,9 @@ public:
     static constexpr GLfloat MOUSE_UNINITIALIZED = -9999.0f;
 
 private:
+    bool _isOutOfBounds(const glm::vec3& position, float margin);
+    bool _isHeroFalling = false;
+    float _heroFallRotation = 0.0f;
     void _drawLostScreen();
     GLuint _lostTexture;
     GLuint _lostVAO = 0;

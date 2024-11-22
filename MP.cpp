@@ -153,8 +153,7 @@ void MP::handleCursorPositionEvent(glm::vec2 currMousePosition) {
         if (_currentCameraMode == ARCBALL) {
             if (_isShiftPressed) {
                 // Zoom in ArcballCam
-                float sensitivity = 1.0f; // Ajustar sensibilidad
-                _arcballCam->zoom(deltaY * sensitivity);
+                _arcballCam->rotate(deltaX, deltaY, viewportWidth, viewportHeight);
             } else {
                 // Rotar ArcballCam
                 _arcballCam->rotate(deltaX, deltaY, viewportWidth, viewportHeight);
@@ -385,8 +384,8 @@ void MP::mSetupScene() {
     _selectedCharacter = AARON_INTI;
 
     _arcballCam->setCameraView(
-        glm::vec3(0.0f, 50.0f, 100.0f), // Posición del ojo
-        glm::vec3(0.0f, 0.0f, 0.0f),    // Punto de mirada (posición del plano)
+        glm::vec3(0.0f, 20.0f, 20.0f), // Posición del ojo
+        glm::vec3(10.0f, 10.0f, 0.0f),    // Punto de mirada (posición del plano)
         CSCI441::Y_AXIS                 // Vector hacia arriba
     );
 
@@ -660,6 +659,10 @@ void MP::_renderScene(glm::mat4 viewMtx, glm::mat4 projMtx, glm::vec3 eyePositio
     heroModelMtx = glm::translate(heroModelMtx, _planePosition);
     heroModelMtx = glm::translate(heroModelMtx, glm::vec3(0.0f, 1.3f, 0.0f));
     heroModelMtx = glm::rotate(heroModelMtx, _planeHeading, CSCI441::Y_AXIS);
+    if (_isHeroFalling) {
+        // Aplicar rotación adicional alrededor del eje X o Z para simular giro
+        heroModelMtx = glm::rotate(heroModelMtx, _heroFallRotation, CSCI441::X_AXIS);
+    }
     _pPlane->setDamaged(_isHeroDamaged);
     _pPlane->drawVehicle(heroModelMtx, viewMtx, projMtx);
     /// FIN DIBUJANDO EL HERO (Aaron_Inti) ////
@@ -688,7 +691,7 @@ void MP::_renderScene(glm::mat4 viewMtx, glm::mat4 projMtx, glm::vec3 eyePositio
     _lightingShaderProgram->setProgramUniform(_lightingShaderUniformLocations.materialShininess, zombieShininess);
 
     for(int i = 0; i < NUM_ZOMBIES; ++i) {
-        if(_zombies[i] != nullptr) {
+        if(_zombies[i] != nullptr && _zombies[i]->isActive) {
             glm::mat4 zombieModelMtx(1.0f);
             _zombies[i]->drawVehicle(zombieModelMtx, viewMtx, projMtx);
         }
@@ -697,7 +700,7 @@ void MP::_renderScene(glm::mat4 viewMtx, glm::mat4 projMtx, glm::vec3 eyePositio
 }
 
 void MP::_updateScene(float deltaTime) {
-    float moveSpeed = 0.5f;
+    float moveSpeed = 0.1f;
     float rotateSpeed = glm::radians(1.5f);
 
     const float MIN_X = -WORLD_SIZE + 3.0f;
@@ -715,9 +718,11 @@ void MP::_updateScene(float deltaTime) {
                         cosf(_planeHeading)
                     );
                     glm::vec3 newPosition = _planePosition - direction * moveSpeed;
-                    newPosition.x = std::max(MIN_X, std::min(newPosition.x, MAX_X));
-                    newPosition.z = std::max(MIN_Z, std::min(newPosition.z, MAX_Z));
                     _planePosition = newPosition;
+                    if (!_isHeroFalling && _isOutOfBounds(_planePosition,0.0f)) {
+                        _isHeroFalling = true;
+                        _heroFallRotation = 0.0f;
+                    }
                     _pPlane->moveBackward();
                 }
                 if (_keys[GLFW_KEY_S]) {
@@ -727,9 +732,11 @@ void MP::_updateScene(float deltaTime) {
                         cosf(_planeHeading)
                     );
                     glm::vec3 newPosition = _planePosition + direction * moveSpeed;
-                    newPosition.x = std::max(MIN_X, std::min(newPosition.x, MAX_X));
-                    newPosition.z = std::max(MIN_Z, std::min(newPosition.z, MAX_Z));
                     _planePosition = newPosition;
+                    if (!_isHeroFalling && _isOutOfBounds(_planePosition,0.0f)) {
+                        _isHeroFalling = true;
+                        _heroFallRotation = 0.0f;
+                    }
                     _pPlane->moveForward();
                 }
                 if (_keys[GLFW_KEY_A]) {
@@ -837,15 +844,25 @@ void MP::_updateScene(float deltaTime) {
 
     if (_gameState == PLAYING) {
         _planePosition += _heroVelocity * deltaTime;
-        _planePosition.y = 0.0f;
+        if (!_isHeroFalling && _isOutOfBounds(_planePosition, 0.0f)) {
+            _isHeroFalling = true;
+            _heroFallRotation = 0.0f;
+        }
+
+        if (!_isHeroFalling) {
+            _planePosition.y = 0.0f;
+        }
         // Aplicar fricción para reducir gradualmente la velocidad
         _heroVelocity *= 0.98f;
         _heroVelocity.y = 0.0f;
 
-        // Opcional: Actualizar zombies si tienen comportamientos
-        for(int i = 0; i < NUM_ZOMBIES; ++i) {
-            if(_zombies[i] != nullptr) {
-                _zombies[i]->update(deltaTime, _planePosition); // Pasamos la posición del héroe
+        float zombieMargin = -1.0f;
+        for (int i = 0; i < NUM_ZOMBIES; ++i) {
+            if (_zombies[i] != nullptr) {
+                if (!_zombies[i]->isFalling && _isOutOfBounds(_zombies[i]->position, zombieMargin)) {
+                    _zombies[i]->isFalling = true;
+                    _zombies[i]->fallRotation = 0.0f;
+                }
             }
         }
 
@@ -862,8 +879,22 @@ void MP::_updateScene(float deltaTime) {
                 _heroDamageTime = 0.0f;
             }
         }
-    }
 
+        if (_isHeroFalling) {
+            int ROTATION_SPEED = 2.0f;
+            int FALL_SPEED = 5.0f;
+            _heroFallRotation += deltaTime * ROTATION_SPEED; // Define ROTATION_SPEED, por ejemplo, 3.0f
+
+            // Decrementar posición Y para simular la caída
+            _planePosition.y -= deltaTime * FALL_SPEED; // Define FALL_SPEED, por ejemplo, 5.0f
+
+            // Cuando alcance cierta altura, finalizar la caída
+            if (_planePosition.y <= -60.0f) { // Altura límite
+                _gameState = LOST;
+                std::cout << "¡El héroe ha caído fuera del mundo! Game Over." << std::endl;
+            }
+        }
+    }
 
 }
 
@@ -1144,7 +1175,7 @@ void MP::_setupSkybox() {
 
 void MP::_moveZombies(float deltaTime) {
     for(int i = 0; i < NUM_ZOMBIES; ++i) {
-        if(_zombies[i] != nullptr) {
+        if (_zombies[i] != nullptr && _zombies[i]->isActive) {
             _zombies[i]->update(deltaTime, _planePosition);
         }
     }
@@ -1295,7 +1326,8 @@ void MP::_drawLostScreen() {
 void MP::_resetGame() {
     // Restablecer el estado del juego
     _gameState = PLAYING;
-
+    _isHeroFalling = false;
+    _heroFallRotation = 0.0f;
     // Restablecer la posición y orientación del héroe
     _planePosition = glm::vec3(0.0f, 0.0f, 0.0f);
     _planeHeading = 0.0f;
@@ -1307,6 +1339,9 @@ void MP::_resetGame() {
     // Restablecer las posiciones y estados de los zombies
     for(int i = 0; i < NUM_ZOMBIES; ++i) {
         if(_zombies[i] != nullptr) {
+            _zombies[i]->isFalling = false;
+            _zombies[i]->fallRotation = 0.0f;
+            _zombies[i]->isActive = true;
             _zombies[i]->position = _zombiePositions[i];
             _zombies[i]->rotationAngle = 0.0f;
             _zombies[i]->velocity = glm::vec3(0.0f);
@@ -1329,11 +1364,17 @@ void MP::_resetGame() {
 
     // Restablecer la cámara si es necesario
     _arcballCam->setCameraView(
-        glm::vec3(0.0f, 50.0f, 100.0f), // Posición del ojo
-        glm::vec3(0.0f, 0.0f, 0.0f),    // Punto de mirada (posición del plano)
+        glm::vec3(0.0f, 20.0f, 20.0f), // Posición del ojo
+        glm::vec3(10.0f, 10.0f, 0.0f),    // Punto de mirada (posición del plano)
         CSCI441::Y_AXIS                 // Vector hacia arriba
     );
     _updateIntiFirstPersonCamera();
+}
+
+bool MP::_isOutOfBounds(const glm::vec3& position, float margin = 0.0f) {
+    const float BOUNDARY = WORLD_SIZE - margin;
+    return position.x < -BOUNDARY || position.x > BOUNDARY ||
+           position.z < -BOUNDARY || position.z > BOUNDARY;
 }
 
 void MP::_computeAndSendMatrixUniforms(glm::mat4 modelMtx, glm::mat4 viewMtx, glm::mat4 projMtx) const {

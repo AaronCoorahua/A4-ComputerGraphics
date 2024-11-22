@@ -28,6 +28,9 @@ public:
     float rotationAngle;
     float radius;
     float speedMultiplier;
+    bool isFalling = false;
+    float fallRotation = 0.0f;
+    bool isActive = true;
 
 private:
     GLuint _shaderProgramHandle;

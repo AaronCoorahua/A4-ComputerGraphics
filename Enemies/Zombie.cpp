@@ -31,7 +31,11 @@ Zombie::Zombie(GLuint shaderProgramHandle, GLint mvpMtxUniformLocation, GLint no
 void Zombie::drawVehicle(glm::mat4 modelMtx, glm::mat4 viewMtx, glm::mat4 projMtx) {
 
     modelMtx = glm::translate(modelMtx, position);
-    modelMtx = glm::rotate(modelMtx, rotationAngle, CSCI441::Y_AXIS);
+    if (isFalling) {
+        modelMtx = glm::rotate(modelMtx, fallRotation, CSCI441::X_AXIS);
+    } else {
+        modelMtx = glm::rotate(modelMtx, rotationAngle, CSCI441::Y_AXIS);
+    }
 
     _drawBody(modelMtx, viewMtx, projMtx);
     _drawArmRight(modelMtx, viewMtx, projMtx);
@@ -96,60 +100,76 @@ void Zombie::moveBackward() {
 }
 
 void Zombie::update(float deltaTime, glm::vec3 heroPosition) {
-    // Calcular dirección hacia el héroe
-    glm::vec3 directionToHero = heroPosition - position;
-    directionToHero.y = 0.0f; // Ignorar componente Y para movimiento en plano XZ
 
-    // Evitar división por cero
-    if(glm::length(directionToHero) < 0.1f) return;
+    if (isFalling) {
+        int ROTATION_SPEED = 8.0f;
+        int FALL_SPEED = 8.0f;
+        fallRotation += deltaTime * ROTATION_SPEED; // Define ROTATION_SPEED
 
-    // Normalizar la dirección hacia el héroe
-    glm::vec3 desiredDirection = glm::normalize(directionToHero);
+        // Decrementar posición Y para simular la caída
+        position.y -= deltaTime * FALL_SPEED; // Define FALL_SPEED
 
-    // Calcular el ángulo deseado
-    float desiredAngle = atan2f(-desiredDirection.x, -desiredDirection.z);
+        // Cuando alcance cierta altura, desaparecer
+        if (position.y <= -60.0f) { // Altura límite
+            // Marcar el zombie como inactivo
+            isActive = false;
+        }
+    } else {
+        // Calcular dirección hacia el héroe
+        glm::vec3 directionToHero = heroPosition - position;
+        directionToHero.y = 0.0f; // Ignorar componente Y para movimiento en plano XZ
 
-    // Calcular la diferencia de ángulo
-    float angleDifference = desiredAngle - rotationAngle;
+        // Evitar división por cero
+        if(glm::length(directionToHero) < 0.1f) return;
 
-    // Asegurar que la diferencia de ángulo esté en el rango [-pi, pi]
-    if(angleDifference > glm::pi<float>())
-        angleDifference -= glm::two_pi<float>();
-    if(angleDifference < -glm::pi<float>())
-        angleDifference += glm::two_pi<float>();
+        // Normalizar la dirección hacia el héroe
+        glm::vec3 desiredDirection = glm::normalize(directionToHero);
 
-    // Definir velocidad máxima de rotación
-    float maxRotationSpeed = glm::radians(90.0f); // 90 grados por segundo
+        // Calcular el ángulo deseado
+        float desiredAngle = atan2f(-desiredDirection.x, -desiredDirection.z);
 
-    // Limitar el cambio de rotación a la velocidad máxima
-    float rotationChange = glm::clamp(angleDifference, -maxRotationSpeed * deltaTime, maxRotationSpeed * deltaTime);
+        // Calcular la diferencia de ángulo
+        float angleDifference = desiredAngle - rotationAngle;
 
-    // Actualizar el ángulo de rotación
-    rotationAngle += rotationChange;
+        // Asegurar que la diferencia de ángulo esté en el rango [-pi, pi]
+        if(angleDifference > glm::pi<float>())
+            angleDifference -= glm::two_pi<float>();
+        if(angleDifference < -glm::pi<float>())
+            angleDifference += glm::two_pi<float>();
 
-    // Mantener rotationAngle dentro de [0, 2π]
-    if(rotationAngle > glm::two_pi<float>())
-        rotationAngle -= glm::two_pi<float>();
-    else if(rotationAngle < 0.0f)
-        rotationAngle += glm::two_pi<float>();
+        // Definir velocidad máxima de rotación
+        float maxRotationSpeed = glm::radians(90.0f); // 90 grados por segundo
 
-    // Actualizar la dirección basada en rotationAngle
-    glm::vec3 forwardDirection(
-        -sinf(rotationAngle),
-        0.0f,
-        -cosf(rotationAngle)
-    );
+        // Limitar el cambio de rotación a la velocidad máxima
+        float rotationChange = glm::clamp(angleDifference, -maxRotationSpeed * deltaTime, maxRotationSpeed * deltaTime);
 
-    // Actualizar la velocidad
-    float baseMoveSpeed = 5.0f; // Velocidad base
-    float moveSpeed = baseMoveSpeed * speedMultiplier;
-    velocity = forwardDirection * moveSpeed;
+        // Actualizar el ángulo de rotación
+        rotationAngle += rotationChange;
 
-    // Actualizar posición usando la velocidad
-    position += velocity * deltaTime;
+        // Mantener rotationAngle dentro de [0, 2π]
+        if(rotationAngle > glm::two_pi<float>())
+            rotationAngle -= glm::two_pi<float>();
+        else if(rotationAngle < 0.0f)
+            rotationAngle += glm::two_pi<float>();
 
-    // Actualizar movimiento de los brazos
-    moveForward();
+        // Actualizar la dirección basada en rotationAngle
+        glm::vec3 forwardDirection(
+            -sinf(rotationAngle),
+            0.0f,
+            -cosf(rotationAngle)
+        );
+
+        // Actualizar la velocidad
+        float baseMoveSpeed = 5.0f; // Velocidad base
+        float moveSpeed = baseMoveSpeed * speedMultiplier;
+        velocity = forwardDirection * moveSpeed;
+
+        // Actualizar posición usando la velocidad
+        position += velocity * deltaTime;
+
+        // Actualizar movimiento de los brazos
+        moveForward();
+    }
 }
 
 
