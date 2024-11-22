@@ -7,7 +7,8 @@
 Zombie::Zombie(GLuint shaderProgramHandle, GLint mvpMtxUniformLocation, GLint normalMtxUniformLocation)
     : _shaderProgramHandle(shaderProgramHandle),
     rotationAngle(0.0f),
-    radius(1.0f){
+    radius(1.0f),
+    speedMultiplier(1.0f){
 
     _shaderProgramUniformLocations.mvpMtx    = mvpMtxUniformLocation;
     _shaderProgramUniformLocations.normalMtx = normalMtxUniformLocation;
@@ -140,7 +141,8 @@ void Zombie::update(float deltaTime, glm::vec3 heroPosition) {
     );
 
     // Actualizar la velocidad
-    float moveSpeed = 5.0f; // Unidades por segundo
+    float baseMoveSpeed = 5.0f; // Velocidad base
+    float moveSpeed = baseMoveSpeed * speedMultiplier;
     velocity = forwardDirection * moveSpeed;
 
     // Actualizar posición usando la velocidad

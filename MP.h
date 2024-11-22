@@ -68,7 +68,7 @@ private:
     glm::vec3 _coinPositions[4];
 
     // ZOMBIES
-    static constexpr int NUM_ZOMBIES = 8;
+    static constexpr int NUM_ZOMBIES = 12;
     Zombie* _zombies[NUM_ZOMBIES]; // Arreglo para almacenar los ocho zombies
     glm::vec3 _zombiePositions[NUM_ZOMBIES]; // Arreglo para las posiciones de los zombies
 
@@ -185,6 +185,12 @@ private:
     void _setupSkybox();
     void _moveZombies(float deltaTime);
     void _collideZombiesWithZombies();
+
+    glm::vec3 _heroVelocity;
+    bool _isHeroDamaged;
+    float _heroDamageTime;
+    const float HERO_DAMAGE_DURATION = 1.0f;
+    void _collideHeroWithZombies(float deltaTime);
 };
 
 // Declaración de las funciones de callback

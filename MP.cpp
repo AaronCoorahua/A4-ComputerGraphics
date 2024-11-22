@@ -35,7 +35,10 @@ MP::MP()
       _isLeftMouseButtonPressed(false),
       _isZooming(false),
       _currentCameraMode(ARCBALL),
-      _isSmallViewportActive(false)
+      _isSmallViewportActive(false),
+      _isHeroDamaged(false),
+      _heroDamageTime(0.0f),
+      _heroVelocity(0.0f, 0.0f, 0.0f)
 {
     // Inicializar todas las teclas como no presionadas
     for(auto& _key : _keys) _key = GL_FALSE;
@@ -331,10 +334,22 @@ void MP::mSetupScene() {
     _zombiePositions[6] = glm::vec3(cornerOffset - spacing, zombieHeight, cornerOffset - spacing);
     _zombiePositions[7] = glm::vec3(cornerOffset + spacing, zombieHeight, cornerOffset + spacing);
 
+    _zombiePositions[8] = glm::vec3(-WORLD_SIZE + 3.0f, zombieHeight, 0.0f);
+    _zombiePositions[9] = glm::vec3(WORLD_SIZE - 3.0f, zombieHeight, 0.0f);
+    _zombiePositions[8] = glm::vec3(0.0f, zombieHeight, -WORLD_SIZE + 3.0f);
+    _zombiePositions[9] = glm::vec3(0.0f, zombieHeight, WORLD_SIZE - 3.0f);
+
     for(int i = 0; i < NUM_ZOMBIES; ++i) {
         if(_zombies[i] != nullptr) {
             _zombies[i]->position = _zombiePositions[i];
             _zombies[i]->rotationAngle = 0.0f;
+
+            // Asignar multiplicadores de velocidad
+            if(i % 3 == 0) {
+                _zombies[i]->speedMultiplier = 0.7f; // Zombies más lentos
+            } else {
+                _zombies[i]->speedMultiplier = 1.0f; // Velocidad normal
+            }
         }
     }
 
@@ -472,6 +487,7 @@ void MP::_renderScene(glm::mat4 viewMtx, glm::mat4 projMtx, glm::vec3 eyePositio
     heroModelMtx = glm::translate(heroModelMtx, _planePosition);
     heroModelMtx = glm::translate(heroModelMtx, glm::vec3(0.0f, 1.3f, 0.0f));
     heroModelMtx = glm::rotate(heroModelMtx, _planeHeading, CSCI441::Y_AXIS);
+    _pPlane->setDamaged(_isHeroDamaged);
     _pPlane->drawVehicle(heroModelMtx, viewMtx, projMtx);
     /// FIN DIBUJANDO EL HERO (Aaron_Inti) ////
 
@@ -633,6 +649,12 @@ void MP::_updateScene(float deltaTime) {
         }
     }
 
+    _planePosition += _heroVelocity * deltaTime;
+    _planePosition.y = 0.0f;
+    // Aplicar fricción para reducir gradualmente la velocidad
+    _heroVelocity *= 0.98f;
+    _heroVelocity.y = 0.0f;
+
     // Opcional: Actualizar zombies si tienen comportamientos
     for(int i = 0; i < NUM_ZOMBIES; ++i) {
         if(_zombies[i] != nullptr) {
@@ -642,6 +664,17 @@ void MP::_updateScene(float deltaTime) {
 
     _moveZombies(deltaTime);
     _collideZombiesWithZombies();
+
+    _collideHeroWithZombies(deltaTime);
+
+    // Actualizar el temporizador de daño del héroe
+    if(_isHeroDamaged) {
+        _heroDamageTime += deltaTime;
+        if(_heroDamageTime >= HERO_DAMAGE_DURATION) {
+            _isHeroDamaged = false;
+            _heroDamageTime = 0.0f;
+        }
+    }
 }
 
 void MP::run() {
@@ -708,6 +741,39 @@ void MP::run() {
 
         glfwSwapBuffers(mpWindow);
         glfwPollEvents();
+    }
+}
+
+
+void MP::_collideHeroWithZombies(float deltaTime) {
+    float heroRadius = 2.0f; // Ajusta según el tamaño de tu héroe
+
+    for(int i = 0; i < NUM_ZOMBIES; ++i) {
+        Zombie* zombie = _zombies[i];
+        if(zombie == nullptr) continue;
+
+        // Calcular la distancia entre el héroe y el zombie
+        glm::vec3 delta = _planePosition - zombie->position;
+        float distance = glm::length(delta);
+
+        float sumRadius = heroRadius + zombie->radius;
+
+        // Si hay colisión
+        if(distance < sumRadius) {
+            // Manejar colisión
+            if(!_isHeroDamaged) {
+                _isHeroDamaged = true;
+                _heroDamageTime = 0.0f; // Iniciar temporizador de daño
+                std::cout << "¡El héroe ha sido golpeado por un zombie!" << std::endl;
+
+                // Calcular dirección de empuje
+                glm::vec3 pushDirection = glm::normalize(delta);
+                float pushStrength = 80.0f; // Ajusta este valor para modificar la fuerza del rebote
+
+                // Aplicar velocidad al héroe
+                _heroVelocity += pushDirection * pushStrength;
+            }
+        }
     }
 }
 
@@ -888,7 +954,7 @@ void MP::_collideZombiesWithZombies() {
                 j /= 2; // Suponiendo masas iguales
 
                 // Calcular el impulso vectorial
-                glm::vec3 impulse = j * collisionNormal;
+                glm::vec3 impulse = j * 80*collisionNormal;
 
                 // Actualizar las velocidades de los zombies
                 zombie1->velocity += impulse;

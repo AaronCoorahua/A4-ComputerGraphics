@@ -14,9 +14,10 @@ public:
 
     void moveForward();
     void moveBackward();
-
+    void setDamaged(bool isDamaged);
 private:
 
+    bool _isDamaged;
     glm::vec3 _colorWindow;
     glm::vec3 _scaleWindow;
     glm::vec3 _windowPositions[2];

@@ -27,6 +27,7 @@ public:
     glm::vec3 velocity;
     float rotationAngle;
     float radius;
+    float speedMultiplier;
 
 private:
     GLuint _shaderProgramHandle;

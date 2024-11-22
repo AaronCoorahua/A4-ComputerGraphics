@@ -7,7 +7,7 @@
 #include <OpenGLUtils.hpp>
 
 Aaron_Inti::Aaron_Inti(GLuint shaderProgramHandle, GLint mvpMtxUniformLocation, GLint normalMtxUniformLocation)
-    : _shaderProgramHandle(shaderProgramHandle) {
+    : _shaderProgramHandle(shaderProgramHandle), _isDamaged(false) {
     _propAngle = 0.0f;
     _propAngleRotationSpeed = _PI / 16.0f;
 
@@ -198,6 +198,9 @@ void Aaron_Inti::_computeAndSendMatrixUniforms(glm::mat4 modelMtx, glm::mat4 vie
 }
 
 void Aaron_Inti::_setMaterialColors(glm::vec3 color, float shininess) const {
+    if (_isDamaged) {
+        color = glm::vec3(1.0f, 0.0f, 0.0f);
+    }
     glm::vec3 ambientColor  = color * 0.2f;
     glm::vec3 diffuseColor  = color;
     glm::vec3 specularColor = glm::vec3(0.5f);
@@ -206,4 +209,9 @@ void Aaron_Inti::_setMaterialColors(glm::vec3 color, float shininess) const {
     glProgramUniform3fv(_shaderProgramHandle, _shaderProgramUniformLocations.materialDiffuseColor, 1, glm::value_ptr(diffuseColor));
     glProgramUniform3fv(_shaderProgramHandle, _shaderProgramUniformLocations.materialSpecularColor, 1, glm::value_ptr(specularColor));
     glProgramUniform1f(_shaderProgramHandle, _shaderProgramUniformLocations.materialShininess, shininess);
+}
+
+
+void Aaron_Inti::setDamaged(bool isDamaged) {
+    _isDamaged = isDamaged;
 }
