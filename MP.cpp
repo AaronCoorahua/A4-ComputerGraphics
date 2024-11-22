@@ -250,8 +250,37 @@ void MP::mSetupBuffers() {
                                  _lightingShaderUniformLocations.mvpMatrix,
                                  _lightingShaderUniformLocations.normalMatrix);
     }
-
+    _hudShaderProgram = new CSCI441::ShaderProgram("shaders/hud.v.glsl", "shaders/hud.f.glsl");
     _createGroundBuffers();
+
+    float heartVertices[] = {
+        // Posiciones    // Coordenadas de textura
+        0.0f, 1.0f,      0.0f, 1.0f, // Arriba izquierda
+        1.0f, 0.0f,      1.0f, 0.0f, // Abajo derecha
+        0.0f, 0.0f,      0.0f, 0.0f, // Abajo izquierda
+
+        0.0f, 1.0f,      0.0f, 1.0f, // Arriba izquierda
+        1.0f, 1.0f,      1.0f, 1.0f, // Arriba derecha
+        1.0f, 0.0f,      1.0f, 0.0f  // Abajo derecha
+    };
+
+    glGenVertexArrays(1, &_heartVAO);
+    glGenBuffers(1, &_heartVBO);
+
+    glBindVertexArray(_heartVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, _heartVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(heartVertices), heartVertices, GL_STATIC_DRAW);
+
+    // Posiciones
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    // Coordenadas de textura
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+    glBindVertexArray(0);
+
 }
 
 void MP::_createGroundBuffers() {
@@ -409,6 +438,30 @@ void MP::mSetupScene() {
     _lightingShaderProgram->setProgramUniform(_lightingShaderUniformLocations.spotLightQuadratic, spotLightQuadratic);
 
     _setupSkybox();
+
+    int heart_width, heart_height, nrChannels;
+    unsigned char *data = stbi_load("textures/heart.png", &heart_width, &heart_height, &nrChannels, 0);
+    if (data) {
+        glGenTextures(1, &_heartTexture);
+        glBindTexture(GL_TEXTURE_2D, _heartTexture);
+
+        // Configurar los parámetros de la textura
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        GLenum format = GL_RGBA; // Asegúrate de que la imagen tenga canal alfa
+        if (nrChannels == 3)
+            format = GL_RGB;
+
+        glTexImage2D(GL_TEXTURE_2D, 0, format, heart_width, heart_height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        stbi_image_free(data);
+    } else {
+        std::cout << "Failed to load heart texture" << std::endl;
+    }
 }
 
 void MP::mCleanupShaders() {
@@ -423,13 +476,16 @@ void MP::mCleanupBuffers() {
     CSCI441::deleteObjectVAOs();
     glDeleteVertexArrays(1, &_groundVAO);
     glDeleteVertexArrays(1, &_skyboxVAO);
+    glDeleteVertexArrays(1, &_heartVAO);
 
     fprintf(stdout, "[INFO]: ...deleting VBOs....\n");
     CSCI441::deleteObjectVBOs();
     glDeleteBuffers(1, &_skyboxVBO);
+    glDeleteBuffers(1, &_heartVBO);
 
     fprintf(stdout, "[INFO]: ...deleting models..\n");
     delete _pPlane;
+    glDeleteTextures(1, &_heartTexture);
 }
 
 void MP::_renderScene(glm::mat4 viewMtx, glm::mat4 projMtx, glm::vec3 eyePosition) const {
@@ -691,8 +747,8 @@ void MP::run() {
         glDrawBuffer(GL_BACK);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        GLint framebufferWidth, framebufferHeight;
         glfwGetFramebufferSize(mpWindow, &framebufferWidth, &framebufferHeight);
+        _hudProjection = glm::ortho(0.0f, static_cast<float>(framebufferWidth), 0.0f, static_cast<float>(framebufferHeight));
 
         glViewport(0, 0, framebufferWidth, framebufferHeight);
         float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
@@ -735,12 +791,23 @@ void MP::run() {
             _renderScene(fpViewMatrix, smallProjectionMatrix, fpEyePosition);
 
             glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-        }
 
+        }
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Dibujar el HUD
+        _drawHUD();
+
+        // Restaurar estado de OpenGL
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_BLEND);
         _updateScene(deltaTime);
 
         glfwSwapBuffers(mpWindow);
         glfwPollEvents();
+
     }
 }
 
@@ -765,6 +832,13 @@ void MP::_collideHeroWithZombies(float deltaTime) {
                 _isHeroDamaged = true;
                 _heroDamageTime = 0.0f; // Iniciar temporizador de daño
                 std::cout << "¡El héroe ha sido golpeado por un zombie!" << std::endl;
+
+                // Decrementar vidas
+                _heroLives--;
+                if(_heroLives <= 0) {
+                    std::cout << "¡El héroe ha perdido todas sus vidas!" << std::endl;
+                    // Manejar fin del juego o reinicio
+                }
 
                 // Calcular dirección de empuje
                 glm::vec3 pushDirection = glm::normalize(delta);
@@ -973,6 +1047,39 @@ void MP::_collideZombiesWithZombies() {
         }
     }
 }
+
+
+void MP::_drawHUD() {
+    _hudShaderProgram->useProgram();
+    _hudShaderProgram->setProgramUniform("projection", _hudProjection);
+
+    glBindVertexArray(_heartVAO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, _heartTexture);
+    _hudShaderProgram->setProgramUniform("texture1", 0); // Asignamos la unidad de textura 0
+
+    // Tamaño del corazón en píxeles
+    float heartWidth = 50.0f;
+    float heartHeight = 50.0f;
+
+    for(int i = 0; i < _heroLives; ++i) {
+        glm::mat4 model = glm::mat4(1.0f);
+
+        // Posición del corazón
+        float x = framebufferWidth - (i + 1) * (heartWidth + 10.0f); // Separación de 10 píxeles
+        float y = framebufferHeight - heartHeight - 10.0f; // 10 píxeles desde el borde superior
+
+        model = glm::translate(model, glm::vec3(x, y, 0.0f));
+        model = glm::scale(model, glm::vec3(heartWidth, heartHeight, 1.0f));
+
+        _hudShaderProgram->setProgramUniform("model", model);
+
+
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    }
+    glBindVertexArray(0);
+}
+
 
 
 void MP::_computeAndSendMatrixUniforms(glm::mat4 modelMtx, glm::mat4 viewMtx, glm::mat4 projMtx) const {

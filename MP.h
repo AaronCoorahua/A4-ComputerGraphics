@@ -62,6 +62,13 @@ public:
     static constexpr GLfloat MOUSE_UNINITIALIZED = -9999.0f;
 
 private:
+    int framebufferWidth, framebufferHeight;
+    void _drawHUD();
+    int _heroLives = 3;
+    CSCI441::ShaderProgram* _hudShaderProgram = nullptr;
+    GLuint _heartVAO = 0;
+    GLuint _heartVBO = 0;
+    glm::mat4 _hudProjection;
     // COINS
 
     Coin* _coins[4]; // Arreglo para almacenar las cuatro monedas
@@ -191,6 +198,8 @@ private:
     float _heroDamageTime;
     const float HERO_DAMAGE_DURATION = 1.0f;
     void _collideHeroWithZombies(float deltaTime);
+
+    GLuint _heartTexture;
 };
 
 // Declaración de las funciones de callback
